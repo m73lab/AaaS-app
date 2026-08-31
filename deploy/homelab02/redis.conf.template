@@ -1,0 +1,12 @@
+# Redis with mutual TLS. The proxy authenticates with a client certificate
+# (signed by our CA) and verifies this server certificate against the same CA.
+# __REDIS_PASSWORD__ is substituted at deploy time by scripts/setup-homelab02.sh.
+port 0
+tls-port 6379
+tls-cert-file /certs/redis-server.crt
+tls-key-file /certs/redis-server.key
+tls-ca-cert-file /certs/ca.crt
+tls-auth-clients yes
+requirepass __REDIS_PASSWORD__
+appendonly no
+save ""

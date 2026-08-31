@@ -1,0 +1,103 @@
+# Full AaaS stack on homelab02. Redis and Presidio are NOT published to the
+# host network. Only two loopback ports are exposed for SSH-tunneling:
+#   - 8080 : the proxy (your apps call it)
+#   - 5444 : the admin mTLS endpoint for KEK rotation
+# Secrets come from .env (AaaS_MASTER_KEY, AaaS_KEK_VERSION, REDIS_PASSWORD).
+
+services:
+  redis:
+    image: redis:7
+    command: ["redis-server", "/conf/redis.conf"]
+    volumes:
+      - ./redis.conf:/conf/redis.conf:ro
+      - ./certs:/certs:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--tls", "--cert", "/certs/redis-client.crt",
+             "--key", "/certs/redis-client.key", "--cacert", "/certs/ca.crt",
+             "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # No published port: reachable only on the compose network.
+
+  presidio-analyzer:
+    image: mcr.microsoft.com/presidio-analyzer:latest
+    environment:
+      - PORT=3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://localhost:3000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  presidio-anonymizer:
+    image: mcr.microsoft.com/presidio-anonymizer:latest
+    environment:
+      - PORT=3000
+    restart: unless-stopped
+
+  # mTLS edge: proxies to Presidio (5443, internal) and exposes the admin
+  # rotation endpoint (5444, loopback) — both require a client certificate.
+  edge:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx/edge.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/certs:ro
+    depends_on:
+      - presidio-analyzer
+      - proxy
+    restart: unless-stopped
+    ports:
+      - "5444:5444"
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+      presidio-analyzer:
+        condition: service_healthy
+    environment:
+      - AaaS_MASTER_KEY=${AaaS_MASTER_KEY}
+      - AaaS_KEK_VERSION=${AaaS_KEK_VERSION:-1}
+      - AaaS_ADMIN_KEY=${AaaS_ADMIN_KEY}
+    volumes:
+      - ./config.homelab02.yaml:/app/config.yaml:ro
+      - ./certs:/certs:ro
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8080:8080"
+
+  # --- AaaS Dashboard backend (Express + Supabase) -----------------------
+  dashboard-backend:
+    build:
+      context: ./dashboard-backend
+      dockerfile: Dockerfile
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URL=redis://redis:6379
+      - CORS_ORIGINS=http://localhost:3000,http://homelab02:3000
+      - PORT=3001
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # No published port: reached via dashboard-frontend (same network).
+
+  # --- AaaS Dashboard frontend (React SPA served by nginx) ---------------
+  dashboard-frontend:
+    build:
+      context: ./dashboard-client
+      dockerfile: Dockerfile
+    depends_on:
+      - dashboard-backend
+    restart: unless-stopped
+    ports:
+      - "3000:80"

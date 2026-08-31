@@ -1,0 +1,16 @@
+[Unit]
+Description=AaaS LLM Anonymization Proxy stack (Redis+mTLS, Presidio, proxy)
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+WorkingDirectory=/opt/aaas
+# Build and run the whole stack as a single unit.
+ExecStartPre=/usr/bin/docker compose -f /opt/aaas/docker-compose.yml build
+ExecStart=/usr/bin/docker compose -f /opt/aaas/docker-compose.yml up
+ExecStop=/usr/bin/docker compose -f /opt/aaas/docker-compose.yml down
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,28 @@
+# build artifacts
+aaas-proxy
+bin/
+*.exe
+
+# generated TLS material (secrets!)
+deploy/certs/
+*.srl
+
+# runtime outputs
+audit.log
+*.log
+
+# rendered config + secrets (never commit)
+config.homelab02.yaml
+.env
+.deploy.env
+
+# dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,17 @@
+# Microsoft Presidio (ONNX-backed NER) as a sidecar for the AaaS proxy.
+# Run with:  docker compose -f deploy/presidio/docker-compose.yml up -d
+# Then set in config.yaml:  detect.presidio_url: "http://localhost:5002/analyze"
+services:
+  presidio-analyzer:
+    image: mcr.microsoft.com/presidio-analyzer:latest
+    ports:
+      - "5002:3000"
+    environment:
+      - PORT=3000
+
+  presidio-anonymizer:
+    image: mcr.microsoft.com/presidio-anonymizer:latest
+    ports:
+      - "5003:3000"
+    environment:
+      - PORT=3000

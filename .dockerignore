@@ -1,0 +1,7 @@
+.git
+bin
+*.exe
+*.log
+deploy/certs
+config.homelab02.yaml
+*.env

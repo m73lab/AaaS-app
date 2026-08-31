@@ -1,0 +1,73 @@
+server:
+  listen: ":8080"
+
+upstream:
+  base_url: "https://api.openai.com/v1"
+  api_key: ""
+  timeout: 30
+
+vault:
+  type: "redis"
+  redis_addr: "redis:6379"          # compose service name (internal network)
+  redis_password: "__REDIS_PASSWORD__"
+  redis_db: 0
+  redis_tls: true
+  redis_client_cert: "/certs/redis-client.crt"
+  redis_client_key:  "/certs/redis-client.key"
+  redis_ca_cert:      "/certs/ca.crt"
+  ttl_seconds: 300
+  kms:
+    type: "rotating"
+    master_key_env: "AaaS_MASTER_KEY"   # injected via container env (from .env)
+    version_env: "AaaS_KEK_VERSION"
+
+detect:
+  enable_phone: true
+  heuristic_ner: true
+  # Presidio reached through the mTLS edge (nginx) at presidio-tls:5443.
+  # The proxy presents /certs/redis-client.* and verifies the server via /certs/ca.crt.
+  presidio_url: "https://presidio-tls:5443/analyze"
+  presidio_lang: "en"                            # use "es" if ES model installed
+  presidio_ca: "/certs/ca.crt"
+  presidio_client_cert: "/certs/redis-client.crt"
+  presidio_client_key: "/certs/redis-client.key"
+  person_names:
+    - "María González"
+    - "Maria Gonzalez"
+    - "Juan Pérez"
+    - "Juan Perez"
+    - "Acme Corp"
+  dictionary: []
+
+policy:
+  default_action: "reversible"
+  fail_closed: false
+  rules:
+    - categories: ["CREDIT_CARD"]
+      action: "block"
+    - categories: ["EMAIL", "RUT", "PHONE", "IPV4"]
+      action: "reversible"
+    - categories: ["PERSON", "ORG", "CUSTOM", "LOCATION"]
+      action: "fpe"
+
+audit:
+  enabled: true
+  path: "/app/audit.log"   # PII-free JSON lines inside the container
+
+# Per-tenant request ceilings (sliding window). Limits are looked up by the
+# X-Tenant-ID header; missing tenants fall back to "default".
+rate_limit:
+  enabled: true
+  default:
+    per_minute: 60
+    per_hour: 2000
+  tenants:
+    demo:
+      per_minute: 30
+      per_hour: 500
+
+# Ship per-request usage analytics to the dashboard backend.
+dashboard:
+  usage_url: "http://dashboard-backend:3001/v1/aas/usage-logs"
+  enabled: true
+
