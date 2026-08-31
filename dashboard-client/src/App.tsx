@@ -3,7 +3,6 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { TenantsPage } from './pages/TenantsPage';
 import { LogsPage } from './pages/LogsPage';
 import { DocsPage } from './pages/DocsPage';
 
@@ -17,14 +16,6 @@ export function App() {
         element={
           <ProtectedRoute>
             <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/tenants"
-        element={
-          <ProtectedRoute>
-            <TenantsPage />
           </ProtectedRoute>
         }
       />

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import bodyParser from 'body-parser';
 import { env } from './config/env.js';
 import { buildContainer } from './app.bootstrap.js';
 import { createRouter } from './routes/index.js';
@@ -7,7 +8,7 @@ import { withErrorHandler } from './lib/middleware/withErrorHandler.js';
 
 const app = express();
 app.use(cors({ origin: env.corsOrigins, credentials: true }));
-app.use(express.json({ limit: '1mb' }));
+app.use(bodyParser.json({ limit: '1mb' }));
 
 const container = buildContainer();
 app.use('/v1/aas', createRouter(container));

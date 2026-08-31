@@ -5,7 +5,7 @@ import type { UsageLogService } from '../../application/usage-log.service.js';
 import type { Request, Response } from 'express';
 
 export const ingestSchema = z.object({
-  tenantId: z.string().uuid(),
+  tenantId: z.string().min(1),
   sessionId: z.string().min(1),
   model: z.string().optional(),
   provider: z.string().optional(),

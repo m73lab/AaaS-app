@@ -20,16 +20,6 @@ export interface UsagePoint {
   entities: number;
 }
 
-export interface Tenant {
-  id: string;
-  name: string;
-  email: string;
-  plan: string;
-  rateLimitPerMin: number;
-  rateLimitPerHour: number;
-  active: boolean;
-}
-
 export interface UsageLog {
   id: number;
   tenantId: string;
@@ -46,39 +36,31 @@ export interface UsageLog {
   latencyMs: number | null;
 }
 
-const dayAgo = () => new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-const nowISO = () => new Date().toISOString();
+const now = new Date();
+const dayAgo = new Date(now.getTime() - 24 * 3600 * 1000);
+const FROM = dayAgo.toISOString();
+const TO = now.toISOString();
 
 export function useOverview() {
-  const from = dayAgo();
-  const to = nowISO();
   return useQuery({
-    queryKey: queryKeys.overview(from, to),
-    queryFn: () => api.get<Overview>(`/v1/aas/analytics/overview?from=${from}&to=${to}`),
+    queryKey: queryKeys.overview,
+    queryFn: () => api.get<Overview>(`/v1/aas/analytics/overview?from=${FROM}&to=${TO}`),
+    refetchInterval: 30000,
   });
 }
 
-export function useUsageSeries(tenantId?: string) {
-  const from = dayAgo();
-  const to = nowISO();
-  const qs = tenantId ? `&tenantId=${tenantId}` : '';
+export function useUsageSeries() {
   return useQuery({
-    queryKey: queryKeys.usage(from, to, tenantId),
-    queryFn: () => api.get<UsagePoint[]>(`/v1/aas/analytics/usage?from=${from}&to=${to}${qs}`),
+    queryKey: queryKeys.usage(),
+    queryFn: () => api.get<UsagePoint[]>(`/v1/aas/analytics/usage?from=${FROM}&to=${TO}`),
+    refetchInterval: 30000,
   });
 }
 
-export function useTenants() {
+export function useLogs() {
   return useQuery({
-    queryKey: queryKeys.tenants(),
-    queryFn: () => api.get<Tenant[]>('/v1/aas/tenants'),
-  });
-}
-
-export function useLogs(tenantId?: string) {
-  const qs = tenantId ? `?tenantId=${tenantId}` : '';
-  return useQuery({
-    queryKey: queryKeys.logs(tenantId),
-    queryFn: () => api.get<UsageLog[]>(`/v1/aas/usage-logs${qs}`),
+    queryKey: queryKeys.logs,
+    queryFn: () => api.get<UsageLog[]>('/v1/aas/usage-logs'),
+    refetchInterval: 10000,
   });
 }

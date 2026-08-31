@@ -121,12 +121,12 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	atomic.AddInt64(&s.reqCount, 1)
 	start := time.Now()
 
-	// --- Required headers (BYOK + tenant attribution) -------------------
+	// --- Required headers (BYOK) ------------------------------------------
 	clientKey := r.Header.Get("X-LLM-API-Key")
 	clientBaseURL := r.Header.Get("X-LLM-Base-URL")
 	tenant := s.tenantOf(r)
-	if clientKey == "" || clientBaseURL == "" || tenant == "default" {
-		http.Error(w, "missing required headers: X-LLM-API-Key, X-LLM-Base-URL and X-Tenant-ID are mandatory", http.StatusBadRequest)
+	if clientKey == "" || clientBaseURL == "" {
+		http.Error(w, "missing required headers: X-LLM-API-Key and X-LLM-Base-URL are mandatory", http.StatusBadRequest)
 		return
 	}
 

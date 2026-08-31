@@ -3,7 +3,6 @@ import { useClientSession } from '../context/ClientSessionContext';
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard' },
-  { to: '/tenants', label: 'Tenants' },
   { to: '/logs', label: 'Logs' },
   { to: '/docs', label: 'API Docs' },
 ];

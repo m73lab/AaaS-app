@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { Container } from '../../../core/dependency-injection/container.js';
 import { SERVICE_KEYS } from '../../../core/dependency-injection/service-keys.js';
-import { SupabaseAnalyticsRepository } from '../infrastructure/supabase-analytics.repository.js';
+import { PgAnalyticsRepository } from '../infrastructure/supabase-analytics.repository.js';
 import { AnalyticsService } from '../application/analytics.service.js';
 import { createAnalyticsController } from '../interfaces/http/analytics.api.controller.js';
 
 export function registerAnalytics(container: Container): void {
   container.register(SERVICE_KEYS.AnalyticsService, (c) =>
-    new AnalyticsService(new SupabaseAnalyticsRepository(c.get(SERVICE_KEYS.SupabaseClient))),
+    new AnalyticsService(new PgAnalyticsRepository(c.get(SERVICE_KEYS.Pool))),
   );
 }
 

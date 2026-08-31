@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { ApiError } from '../../../lib/errors.js';
 import { signToken } from '../../../lib/middleware/withAuth.js';
-import type { AdminRepository } from '../infrastructure/persistence/supabase-admin.repository.js';
+import type { PgAdminRepository } from '../infrastructure/persistence/supabase-admin.repository.js';
 import type { AdminLoginResult } from '../domain/admin.entity.js';
 
 export interface LoginInput {
@@ -10,7 +10,7 @@ export interface LoginInput {
 }
 
 export class AuthService {
-  constructor(private adminRepo: AdminRepository) {}
+  constructor(private adminRepo: PgAdminRepository) {}
 
   async login(input: LoginInput): Promise<{ token: string; admin: AdminLoginResult }> {
     const admin = await this.adminRepo.findByEmail(input.email);

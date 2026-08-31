@@ -1,54 +1,39 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Pool } from 'pg';
 import { ApiError } from '../../../lib/errors.js';
 import type { UsageLogEntity } from '../domain/usage-log.entity.js';
 import type { IngestUsageInput, UsageLogRepository, UsageQuery } from '../domain/usage-log.repository.js';
 
-interface Row {
-  id: number;
-  tenant_id: string;
-  timestamp: string;
-  session_id: string;
-  model: string | null;
-  provider: string | null;
-  format: string | null;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  entities_detected: number | null;
-  categories: Record<string, number> | null;
-  action: string;
-  latency_ms: number | null;
-}
-
-export class SupabaseUsageLogRepository implements UsageLogRepository {
-  constructor(private db: SupabaseClient) {}
+export class PgUsageLogRepository implements UsageLogRepository {
+  constructor(private db: Pool) {}
 
   async insert(input: IngestUsageInput): Promise<void> {
-    const { error } = await this.db.from('usage_logs').insert({
-      tenant_id: input.tenantId,
-      session_id: input.sessionId,
-      model: input.model ?? null,
-      provider: input.provider ?? null,
-      format: input.format ?? null,
-      prompt_tokens: input.promptTokens ?? null,
-      completion_tokens: input.completionTokens ?? null,
-      entities_detected: input.entitiesDetected ?? null,
-      categories: input.categories ?? null,
-      action: input.action,
-      latency_ms: input.latencyMs ?? null,
-    });
-    if (error) throw ApiError.internal(error.message);
+    await this.db.query(
+      `INSERT INTO usage_logs (tenant_id, session_id, model, provider, format, prompt_tokens, completion_tokens, entities_detected, categories, action, latency_ms)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        input.tenantId, input.sessionId, input.model ?? null, input.provider ?? null,
+        input.format ?? null, input.promptTokens ?? null, input.completionTokens ?? null,
+        input.entitiesDetected ?? null,
+        input.categories ? JSON.stringify(input.categories) : null,
+        input.action, input.latencyMs ?? null,
+      ],
+    );
   }
 
   async query(q: UsageQuery): Promise<UsageLogEntity[]> {
-    let query = this.db.from('usage_logs').select('*');
-    if (q.tenantId) query = query.eq('tenant_id', q.tenantId);
-    if (q.from) query = query.gte('timestamp', q.from);
-    if (q.to) query = query.lte('timestamp', q.to);
-    query = query.order('timestamp', { ascending: false }).limit(q.limit ?? 100);
-
-    const { data, error } = await query;
-    if (error) throw ApiError.internal(error.message);
-    return (data as Row[]).map((r) => ({
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    let i = 1;
+    if (q.tenantId) { conditions.push(`tenant_id = $${i++}`); values.push(q.tenantId); }
+    if (q.from) { conditions.push(`timestamp >= $${i++}`); values.push(q.from); }
+    if (q.to) { conditions.push(`timestamp <= $${i++}`); values.push(q.to); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = q.limit ?? 100;
+    const { rows } = await this.db.query(
+      `SELECT * FROM usage_logs ${where} ORDER BY timestamp DESC LIMIT $${i}`,
+      [...values, limit],
+    );
+    return rows.map((r) => ({
       id: r.id,
       tenantId: r.tenant_id,
       timestamp: r.timestamp,

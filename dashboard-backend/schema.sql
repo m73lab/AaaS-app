@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 -- Usage logs (one row per proxy request)
 CREATE TABLE IF NOT EXISTS usage_logs (
   id BIGSERIAL PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  tenant_id TEXT NOT NULL,
   timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
   session_id TEXT NOT NULL,
   model TEXT,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS usage_logs (
 -- Rate limit events (audit trail)
 CREATE TABLE IF NOT EXISTS rate_limit_events (
   id BIGSERIAL PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  tenant_id TEXT NOT NULL,
   timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
   window_type TEXT NOT NULL,
   limit_val INT NOT NULL,

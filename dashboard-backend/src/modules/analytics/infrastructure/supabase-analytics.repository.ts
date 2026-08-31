@@ -1,31 +1,21 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Pool } from 'pg';
 import { ApiError } from '../../../lib/errors.js';
 import type { AnalyticsRepository, Overview, UsagePoint } from '../domain/analytics.repository.js';
 
-interface LogRow {
-  tenant_id: string;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  entities_detected: number | null;
-  categories: Record<string, number> | null;
-  action: string;
-  latency_ms: number | null;
-  timestamp: string;
-}
+export class PgAnalyticsRepository implements AnalyticsRepository {
+  constructor(private db: Pool) {}
 
-export class SupabaseAnalyticsRepository implements AnalyticsRepository {
-  constructor(private db: SupabaseClient) {}
-
-  private async fetch(from: string, to: string, tenantId?: string): Promise<LogRow[]> {
-    let q = this.db
-      .from('usage_logs')
-      .select('tenant_id, prompt_tokens, completion_tokens, entities_detected, categories, action, latency_ms, timestamp')
-      .gte('timestamp', from)
-      .lte('timestamp', to);
-    if (tenantId) q = q.eq('tenant_id', tenantId);
-    const { data, error } = await q;
-    if (error) throw ApiError.internal(error.message);
-    return (data as LogRow[]) ?? [];
+  private async fetch(from: string, to: string, tenantId?: string) {
+    const conditions = ['timestamp >= $1', 'timestamp <= $2'];
+    const values: unknown[] = [from, to];
+    let i = 3;
+    if (tenantId) { conditions.push(`tenant_id = $${i++}`); values.push(tenantId); }
+    const { rows } = await this.db.query(
+      `SELECT tenant_id, prompt_tokens, completion_tokens, entities_detected, categories, action, latency_ms, timestamp
+       FROM usage_logs WHERE ${conditions.join(' AND ')}`,
+      values,
+    );
+    return rows;
   }
 
   async getOverview(from: string, to: string): Promise<Overview> {
@@ -41,7 +31,10 @@ export class SupabaseAnalyticsRepository implements AnalyticsRepository {
       entities += r.entities_detected ?? 0;
       if (r.action === 'blocked' || r.action === 'error') blocked++;
       if (r.latency_ms) { latSum += r.latency_ms; latCount++; }
-      if (r.categories) for (const [k, v] of Object.entries(r.categories)) cats[k] = (cats[k] ?? 0) + v;
+      if (r.categories) {
+        const c = typeof r.categories === 'string' ? JSON.parse(r.categories) : r.categories;
+        for (const [k, v] of Object.entries(c as Record<string, number>)) cats[k] = (cats[k] ?? 0) + v;
+      }
     }
 
     const topCategories = Object.entries(cats)
@@ -65,7 +58,9 @@ export class SupabaseAnalyticsRepository implements AnalyticsRepository {
     const rows = await this.fetch(from, to, tenantId);
     const buckets = new Map<string, UsagePoint>();
     for (const r of rows) {
-      const hour = r.timestamp.slice(0, 13); // YYYY-MM-DDTHH
+      const hour = r.timestamp instanceof Date
+        ? r.timestamp.toISOString().slice(0, 13)
+        : String(r.timestamp).slice(0, 13);
       const key = `${hour}:00`;
       const b = buckets.get(key) ?? { hour: key, requests: 0, tokens: 0, entities: 0 };
       b.requests++;
